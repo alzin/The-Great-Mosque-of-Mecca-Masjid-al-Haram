@@ -14,6 +14,8 @@
  */
 
 import { AGENT_STATE_NAMES, GLOBAL_PHASE_NAMES, GlobalPhase } from '../sim/States.ts';
+import type { AudioState } from '../audio/AudioSystem.ts';
+import { RECITATION } from '../audio/recitation.ts';
 
 export type QualityName = 'low' | 'medium' | 'high';
 
@@ -99,6 +101,7 @@ export class UI {
   private readonly scheduleButton: HTMLButtonElement;
   private readonly cinematicButton: HTMLButtonElement;
   private readonly audioButton: HTMLButtonElement;
+  private readonly audioTrack: HTMLParagraphElement;
   private readonly debugButton: HTMLButtonElement;
   private readonly cameraButtons = new Map<string, HTMLButtonElement>();
   private readonly qualityButtons = new Map<QualityName, HTMLButtonElement>();
@@ -335,7 +338,7 @@ export class UI {
 
       const hint = el('p', 'hint');
       hint.textContent =
-        'A demonstration clock, not a prayer-time calculator. Adhan, iqamah and the start of the prayer are separate events. No audio of the call to prayer or of recitation is produced.';
+        'A demonstration clock, not a prayer-time calculator. Adhan, iqamah and the start of the prayer are separate events. Optional Quran playback runs independently of the prayer animation.';
       s.append(hint);
       controls.append(s);
     }
@@ -385,10 +388,29 @@ export class UI {
       s.append(row);
 
       const row2 = el('div', 'button-row');
-      this.audioButton = button('Audio: off', () => cb.toggleAudio());
+      this.audioButton = button('Quran: off', () => cb.toggleAudio());
       this.audioButton.setAttribute('aria-pressed', 'false');
+      this.audioButton.title = 'Play or pause Quran recitation (M)';
       row2.append(this.audioButton);
       s.append(row2);
+
+      this.audioTrack = el('p', 'hint');
+      this.audioTrack.setAttribute('aria-live', 'polite');
+      this.audioTrack.textContent = 'Al-Fatihah · Surah 1 of 114';
+      s.append(this.audioTrack);
+      const credit = el('p', 'hint');
+      const reciter = el('span');
+      reciter.lang = 'ar';
+      reciter.dir = 'rtl';
+      reciter.textContent = RECITATION.reciterArabic;
+      const source = el('a') as HTMLAnchorElement;
+      source.href = RECITATION.sourcePage;
+      source.target = '_blank';
+      source.rel = 'noopener noreferrer';
+      source.textContent = 'MP3Quran';
+      source.style.color = 'var(--ui-accent)';
+      credit.append(reciter, ' · ', source, document.createElement('br'), 'Continues in Quran order. Internet required.');
+      s.append(credit);
 
       const row3 = el('div', 'button-row');
       this.debugButton = button('Collision view', () => {
@@ -479,7 +501,7 @@ export class UI {
       ['P', 'Call to prayer'],
       ['\u2190 \u2192 \u2191 \u2193', 'Orbit the camera'],
       ['+ / \u2212', 'Dolly in and out'],
-      ['M', 'Audio on / off'],
+      ['M', 'Quran play / pause'],
       ['G', 'Diagnostics panel'],
       ['R', 'Reset'],
       ['?', 'This list'],
@@ -750,9 +772,12 @@ export class UI {
     }
   }
 
-  setAudioState(label: string, on: boolean): void {
-    this.audioButton.textContent = `Audio: ${label}`;
-    this.audioButton.setAttribute('aria-pressed', String(on));
+  setAudioState(state: AudioState, surah: number): void {
+    const label = state === 'starting' ? 'loading…' : state === 'unavailable' ? 'retry' : state === 'blocked' ? 'play' : state;
+    this.audioButton.textContent = `Quran: ${label}`;
+    this.audioButton.setAttribute('aria-pressed', String(state === 'on' || state === 'starting'));
+    const name = surah === 1 ? 'Al-Fatihah · ' : surah === 2 ? 'Al-Baqarah · ' : '';
+    this.audioTrack.textContent = `${name}Surah ${surah} of ${RECITATION.surahCount}`;
   }
 
   setDiagnosticsVisible(on: boolean): void {

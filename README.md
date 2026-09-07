@@ -5,11 +5,12 @@ agent-based crowd performing tawaf around the Kaaba, entering and leaving
 through the gates, and forming curved concentric rows for congregational
 prayer.
 
-**This is a simulation, not a live feed and not a recording.** Nothing here
-is a broadcast, a photograph, or a measured survey of the real building. The
+**The 3D scene is a simulation, not a live feed or a recording.** The visuals
+are not a broadcast, a photograph, or a measured survey of the real building. The
 dimensions are a reconstruction assembled from published figures; the crowd is
 a model; the people are procedurally generated and represent nobody. The
-interface says so, permanently, in the corner of the screen.
+interface says so, permanently, in the corner of the screen. Recorded
+Quran recitation plays separately from the simulated scene.
 
 ## Running it
 
@@ -22,8 +23,9 @@ npm run build      # type-check and produce dist/
 npm run preview    # serve the production build, http://127.0.0.1:4173
 ```
 
-No API keys, no backend, no network access at run time. `npm install` is the
-only thing that touches the network.
+No API keys or backend are required. After `npm install`, the build and visual
+simulation work offline. Quran playback streams recordings from
+MP3Quran.net and requires an internet connection.
 
 Other scripts:
 
@@ -62,7 +64,7 @@ it does not measure physical-device frame rates or replace an iOS device check.
 | `+` / `−` | Dolly in and out |
 | `C` | Cinematic drift |
 | `P` | Call to prayer |
-| `M` | Audio on / off |
+| `M` | Quran play / pause |
 | `G` | Diagnostics panel |
 | `R` | Reset |
 | `?` | Key list |
@@ -75,6 +77,18 @@ precinct, the target, and the number waiting to enter.
 **Congregational prayer** can be called manually or repeated on a timer. Adhan,
 iqamah and the start of the prayer are separate events. Pace and the number of
 rak'ahs are adjustable.
+
+**Quran recitation** uses recordings by **عبد الرحمن السديس — Abdul Rahman
+Al-Sudais**, provided by [MP3Quran.net](https://www.mp3quran.net/ar/sds).
+The app attempts to start playback automatically when it is ready. If the
+browser blocks audible autoplay, it retries on your first click, tap, or key press.
+Press **Quran** or `M` to pause or resume at the same position. A deliberate
+pause stays paused through later interactions until you request playback again.
+Recitation starts with Al-Fatihah, continues through all 114 surahs in Quran
+order, and stops after An-Nas; a new play request then starts again at
+Al-Fatihah. It plays at its original speed, independently of the simulation's
+speed or pause state. If the stream fails, the control shows an error and
+allows you to retry.
 
 **Collision view** (under Display) draws the simplified primitives the crowd
 actually steers around, rather than the rendered architecture. This is the only
@@ -132,13 +146,13 @@ for the post-2016 mataf. The gallery arcades are plausible massing at the
 correct radii, not the real arcades. Six minarets are modelled out of thirteen.
 Do not use this for anything that needs real measurements.
 
-**No sacred text is reproduced.** The kiswah's Qur'anic calligraphy and the
-inscription friezes are deliberately absent, and rendered as abstract gold
-relief instead. See ASSETS.md.
+**No sacred text is rendered on the architecture.** The kiswah's Qur'anic
+calligraphy and the inscription friezes are deliberately absent, and rendered
+as abstract gold relief instead. See ASSETS.md.
 
-**No adhan or recitation.** The optional audio is filtered noise standing in
-for a crowd in a stone courtyard, muted by default. There is no synthesised
-call to prayer and no recitation of any kind.
+**Audio is separate from prayer events.** The Quran recordings are
+not synchronised to the simulated prayer. Adhan and iqamah events have no
+audio. No crowd noise or synthesised call to prayer is used.
 
 **The crowd model is a model.** Social forces with a density–speed coupling
 reproduce plausible aggregate flow. They are not validated against measured

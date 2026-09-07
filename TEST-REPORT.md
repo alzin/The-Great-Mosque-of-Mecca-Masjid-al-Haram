@@ -252,7 +252,9 @@ dist/assets/three-*.js          559.96 kB │ gzip: 141.11 kB
 ```
 
 Total transfer approximately **182 kB gzipped**, of which 141 kB is Three.js.
-There are no other assets: no models, textures, audio or fonts. See ASSETS.md.
+Visual assets are generated at run time, and no audio files are bundled.
+These historical transfer figures exclude the optional remote Quran streaming
+now documented in ASSETS.md.
 
 `npm run build` runs `tsc --noEmit` first, so the build fails on any type
 error. TypeScript is in strict mode and reports zero errors across `src`,
@@ -280,7 +282,7 @@ error. TypeScript is in strict mode and reports zero errors across `src`,
 | Reset | Counters zeroed, re-populates — tested |
 | Window resize | Handled; **not automated** |
 | Background tab | `resync()` discards elapsed wall time; **not automated** |
-| Optional asset failure | Not applicable — there are no external assets |
+| Optional asset failure | At the time of this report, visual assets were generated locally; optional remote Quran audio has since been added — see ASSETS.md |
 | WebGL unavailable | Renders a readable error panel rather than a black screen; **not automated** |
 | 30+ simulated minutes unattended | 40 minutes, all invariants clean — tested |
 

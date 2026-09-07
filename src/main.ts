@@ -15,7 +15,7 @@ import './ui/ui.css';
 
 import { Crowd } from './sim/Crowd.ts';
 import { PrayerOrchestrator } from './sim/PrayerOrchestrator.ts';
-import { AgentState, GlobalPhase } from './sim/States.ts';
+import { GlobalPhase } from './sim/States.ts';
 import { AnimationDirector } from './characters/AnimationDirector.ts';
 import { CrowdRenderer } from './characters/CrowdRenderer.ts';
 import { CrowdView } from './characters/CrowdView.ts';
@@ -23,6 +23,7 @@ import { Environment, type QualityName } from './env/Environment.ts';
 import { DebugCollisionView } from './env/DebugCollision.ts';
 import { CameraSystem, CAMERA_PRESETS } from './camera/CameraSystem.ts';
 import { AudioSystem } from './audio/AudioSystem.ts';
+import { startAutoplay } from './audio/autoplay.ts';
 import { FixedClock, FrameTimer } from './core/Clock.ts';
 import { UI, type UIModel } from './ui/UI.ts';
 
@@ -104,12 +105,7 @@ async function boot(): Promise<void> {
       setQuality: (q) => applyQuality(q),
       reset: () => resetAll(),
       toggleAudio: () => {
-        void audio.toggle().then((state) => {
-          ui.setAudioState(state === 'on' ? 'on' : state === 'unavailable' ? 'unavailable' : 'off', state === 'on');
-          if (state === 'unavailable' && audio.error) {
-            ui.showNotice(`Audio unavailable: ${audio.error}`);
-          }
-        });
+        void audio.toggle();
       },
       setDebugCollision: (on) => {
         debugView.setVisible(on);
@@ -186,7 +182,11 @@ async function boot(): Promise<void> {
 
   // --- Camera / audio ------------------------------------------------------
   const cameraSystem = new CameraSystem(canvas, window.innerWidth / window.innerHeight);
-  const audio = new AudioSystem();
+  const audio = new AudioSystem((state, error) => {
+    ui.setAudioState(state, audio.currentSurah);
+    if (state === 'unavailable' && error) ui.showNotice(error);
+    if (state === 'blocked') ui.showNotice('Tap, click, or press a key to start Quran recitation.', 10000);
+  });
 
   // --- Loop state ----------------------------------------------------------
   const clock = new FixedClock(SIM_HZ, 5);
@@ -298,9 +298,7 @@ async function boot(): Promise<void> {
         if (orchestrator.prepare(clock.stats.simTime)) flushEvents();
         break;
       case 'KeyM':
-        void audio.toggle().then((state) => {
-          ui.setAudioState(state === 'on' ? 'on' : state === 'unavailable' ? 'unavailable' : 'off', state === 'on');
-        });
+        void audio.toggle();
         break;
       case 'KeyG':
         ui.toggleDiagnostics();
@@ -375,16 +373,7 @@ async function boot(): Promise<void> {
       uiAccumulator = 0;
       updateUi();
       flushEvents();
-      audio.setActivity(movingFraction());
-      audio.update(0.2);
     }
-  }
-
-  function movingFraction(): number {
-    const by = crowd.counters.byState;
-    const total = Math.max(1, crowd.liveCount);
-    const still = (by[AgentState.PRAYING] ?? 0) + (by[AgentState.IDLE] ?? 0);
-    return Math.max(0, Math.min(1, 1 - still / total));
   }
 
   function updateUi(): void {
@@ -427,6 +416,12 @@ async function boot(): Promise<void> {
   updateUi();
   clock.resync(performance.now());
   requestAnimationFrame(frame);
+
+  const cancelAutoplay = startAutoplay(audio);
+  window.addEventListener('pagehide', () => {
+    cancelAutoplay();
+    audio.stop();
+  });
 
   // Expose a small handle for the automated visual QA harness. This is read
   // by tools/visual-qa.mjs; it is not part of the public interface.

@@ -22,8 +22,8 @@
  *     complete cycle is watchable; `durationScale` exposes this.
  *   * Qunut, sujud al-sahw and the differences between the madhahib in the
  *     details of hand placement and the sitting posture are not modelled.
- *   * The simulation renders body posture only; it contains no audio or text
- *     of recitation.
+ *   * This orchestrator renders body posture only. Optional Quran recordings
+ *     play independently through AudioSystem, without posture synchronisation.
  *
  * ADHAN / IQAMAH / START
  *   These are kept as three separate, separately configurable events, because
