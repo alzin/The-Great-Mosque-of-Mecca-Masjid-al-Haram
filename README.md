@@ -35,11 +35,24 @@ npm run bench      # CPU cost against population
 npm run poses      # verify the salah postures against physical constraints
 npm run solve      # re-solve the postures (development tool)
 npm run qa         # headless screenshots into qa-output/ (needs Playwright browsers)
+npm run qa:mobile  # touch interactions and responsive layouts (needs Playwright Chromium)
 ```
 
 ## Controls
 
 Drag to orbit, scroll to dolly. Everything is reachable from the keyboard.
+
+On phones and tablets, drag with one finger to orbit and pinch with two to
+zoom. The bottom bar keeps **Pause**, **Controls**, **Camera**, and **Info**
+within reach. Controls open a scrollable panel with Crowd and Prayer sections;
+Info contains display settings, diagnostics, events, and help. Tap the close
+button, tap outside the panel, or swipe down on its header to return to the
+scene. Choosing a camera view also closes the panel.
+
+The mobile layout respects screen safe areas and available viewport height,
+including rotation and keyboard resizing. Desktop panels remain available on
+wider screens. `qa:mobile` checks phone, landscape, tablet, and desktop layouts;
+it does not measure physical-device frame rates or replace an iOS device check.
 
 | Key | Action |
 | --- | --- |

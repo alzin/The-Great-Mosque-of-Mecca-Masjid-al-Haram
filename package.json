@@ -12,6 +12,7 @@
     "soak": "vitest run --config vitest.soak.config.ts",
     "bench": "node --experimental-strip-types tools/bench.ts",
     "qa": "node tools/visual-qa.mjs",
+    "qa:mobile": "node tools/mobile-qa.mjs",
     "poses": "node --experimental-strip-types tools/pose-check.ts",
     "solve": "node --experimental-strip-types tools/solve-poses.ts"
   },

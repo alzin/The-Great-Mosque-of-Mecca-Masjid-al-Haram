@@ -81,6 +81,8 @@ const MIN_POLAR = 0.12;
 const MAX_POLAR = 1.5;
 const MIN_DISTANCE = 22;
 const MAX_DISTANCE = 240;
+/** Widen portrait framing without the distortion of an extreme wide lens. */
+const MAX_PORTRAIT_FOV = 68;
 /** Never let the camera drop below this height above the courtyard. */
 const MIN_HEIGHT = 2.6;
 
@@ -99,6 +101,8 @@ export class CameraSystem {
   private goalDistance = this.distance;
   private readonly goalTarget = new THREE.Vector3(0, 6, 0);
   private goalFov = CAMERA_PRESETS[0].fov;
+  /** Preset FOV before adapting it to the viewport's shape. */
+  private baseFov = CAMERA_PRESETS[0].fov;
 
   /** 0 = no transition running. */
   private transition = 0;
@@ -111,14 +115,13 @@ export class CameraSystem {
   activePreset = CAMERA_PRESETS[0].id;
 
   private readonly domElement: HTMLElement;
-  private dragging = false;
-  private lastPointer = { x: 0, y: 0 };
-  private pointerId: number | null = null;
+  private readonly pointers = new Map<number, { x: number; y: number }>();
+  private gesture: { x: number; y: number; span: number; count: number } | null = null;
   private readonly cleanups: Array<() => void> = [];
 
   constructor(domElement: HTMLElement, aspect: number) {
     this.domElement = domElement;
-    this.camera = new THREE.PerspectiveCamera(CAMERA_PRESETS[0].fov, aspect, 0.5, 2600);
+    this.camera = new THREE.PerspectiveCamera(CAMERA_PRESETS[0].fov, validAspect(aspect), 0.5, 2600);
     this.applyPreset(CAMERA_PRESETS[0], true);
     this.bindInput();
     this.update(0);
@@ -133,25 +136,32 @@ export class CameraSystem {
 
     const onPointerDown = (e: PointerEvent) => {
       if (e.button !== 0) return;
-      this.dragging = true;
-      this.pointerId = e.pointerId;
-      this.lastPointer.x = e.clientX;
-      this.lastPointer.y = e.clientY;
+      this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      this.rebaseGesture();
       el.setPointerCapture(e.pointerId);
       this.cinematic = false;
     };
     const onPointerMove = (e: PointerEvent) => {
-      if (!this.dragging || e.pointerId !== this.pointerId) return;
-      const dx = e.clientX - this.lastPointer.x;
-      const dy = e.clientY - this.lastPointer.y;
-      this.lastPointer.x = e.clientX;
-      this.lastPointer.y = e.clientY;
-      this.orbit(-dx * 0.0042, -dy * 0.0035);
+      if (!this.pointers.has(e.pointerId)) return;
+      const previous = this.gesture;
+      this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      this.rebaseGesture();
+      const current = this.gesture;
+      if (!previous || !current || previous.count !== current.count) return;
+
+      if (current.count === 1) {
+        this.orbit(-(current.x - previous.x) * 0.0042, -(current.y - previous.y) * 0.0035);
+      } else if (previous.span >= 8 && current.span >= 8) {
+        // Spreading two fingers brings the view closer. Use a ratio so zoom
+        // feels consistent at every distance and on different screen sizes.
+        this.dolly(this.distance * (previous.span / current.span - 1));
+      }
     };
     const onPointerUp = (e: PointerEvent) => {
-      if (e.pointerId !== this.pointerId) return;
-      this.dragging = false;
-      this.pointerId = null;
+      if (!this.pointers.delete(e.pointerId)) return;
+      // Rebase on the remaining fingers so lifting either finger cannot
+      // cause the next orbit or pinch to jump.
+      this.rebaseGesture();
       if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
     };
     const onWheel = (e: WheelEvent) => {
@@ -164,6 +174,7 @@ export class CameraSystem {
     el.addEventListener('pointermove', onPointerMove);
     el.addEventListener('pointerup', onPointerUp);
     el.addEventListener('pointercancel', onPointerUp);
+    el.addEventListener('lostpointercapture', onPointerUp);
     el.addEventListener('wheel', onWheel, { passive: false });
 
     this.cleanups.push(() => {
@@ -171,8 +182,25 @@ export class CameraSystem {
       el.removeEventListener('pointermove', onPointerMove);
       el.removeEventListener('pointerup', onPointerUp);
       el.removeEventListener('pointercancel', onPointerUp);
+      el.removeEventListener('lostpointercapture', onPointerUp);
       el.removeEventListener('wheel', onWheel);
     });
+  }
+
+  private rebaseGesture(): void {
+    const points = this.pointers.values();
+    const first = points.next().value;
+    if (!first) {
+      this.gesture = null;
+      return;
+    }
+    const second = points.next().value;
+    this.gesture = {
+      x: first.x,
+      y: first.y,
+      span: second ? Math.hypot(second.x - first.x, second.y - first.y) : 0,
+      count: second ? 2 : 1,
+    };
   }
 
   /** Keyboard control, called by the app's global key handler. */
@@ -254,8 +282,8 @@ export class CameraSystem {
       this.polar = preset.polar;
       this.distance = preset.distance;
       this.target.copy(this.goalTarget);
-      this.camera.fov = preset.fov;
-      this.camera.updateProjectionMatrix();
+      this.baseFov = preset.fov;
+      this.updateProjection();
       this.transition = 0;
     } else {
       this.transition = 1;
@@ -280,10 +308,12 @@ export class CameraSystem {
       this.polar = lerp(this.polar, this.goalPolar, t * 0.16 + dt * 1.2);
       this.distance = lerp(this.distance, this.goalDistance, t * 0.16 + dt * 1.2);
       this.target.lerp(this.goalTarget, Math.min(1, t * 0.16 + dt * 1.2));
-      const fov = lerp(this.camera.fov, this.goalFov, Math.min(1, dt * 2.2));
-      if (Math.abs(fov - this.camera.fov) > 0.001) {
-        this.camera.fov = fov;
-        this.camera.updateProjectionMatrix();
+      const fov = this.transition === 0
+        ? this.goalFov
+        : lerp(this.baseFov, this.goalFov, Math.min(1, dt * 2.2));
+      if (Math.abs(fov - this.baseFov) > 0.001) {
+        this.baseFov = fov;
+        this.updateProjection();
       }
     }
 
@@ -322,7 +352,19 @@ export class CameraSystem {
   }
 
   setAspect(aspect: number): void {
-    this.camera.aspect = aspect;
+    this.camera.aspect = validAspect(aspect);
+    this.updateProjection();
+  }
+
+  private updateProjection(): void {
+    // Preserve the square viewport's horizontal coverage in portrait as far
+    // as the lens cap allows. Keep the unadapted FOV separate so rotating the
+    // device or changing presets cannot accumulate a framing adjustment.
+    const portraitScale = Math.min(1, this.camera.aspect);
+    const adaptedFov = THREE.MathUtils.radToDeg(
+      2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(this.baseFov) / 2) / portraitScale),
+    );
+    this.camera.fov = Math.min(MAX_PORTRAIT_FOV, adaptedFov);
     this.camera.updateProjectionMatrix();
   }
 
@@ -341,7 +383,16 @@ export class CameraSystem {
   dispose(): void {
     for (const c of this.cleanups) c();
     this.cleanups.length = 0;
+    for (const pointerId of this.pointers.keys()) {
+      if (this.domElement.hasPointerCapture(pointerId)) this.domElement.releasePointerCapture(pointerId);
+    }
+    this.pointers.clear();
+    this.gesture = null;
   }
+}
+
+function validAspect(aspect: number): number {
+  return Number.isFinite(aspect) && aspect > 0 ? aspect : 1;
 }
 
 function clamp(v: number, lo: number, hi: number): number {

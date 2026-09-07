@@ -54,7 +54,7 @@ async function boot(): Promise<void> {
   const canvas = document.createElement('canvas');
   canvas.id = 'viewport';
   canvas.tabIndex = 0;
-  canvas.setAttribute('aria-label', '3D simulation viewport. Use arrow keys to orbit the camera.');
+  canvas.setAttribute('aria-label', '3D simulation viewport. Drag to orbit and pinch to zoom, or use arrow keys and plus or minus.');
   app.append(canvas);
 
   let quality: QualityName = 'medium';
@@ -201,7 +201,7 @@ async function boot(): Promise<void> {
   ui.setProgress(1, 'Ready.');
   await nextFrame();
   ui.hideLoading();
-  canvas.focus();
+  if (window.matchMedia('(pointer: fine)').matches) canvas.focus({ preventScroll: true });
 
   // --- Helpers -------------------------------------------------------------
 
@@ -260,10 +260,11 @@ async function boot(): Promise<void> {
   // --- Input ---------------------------------------------------------------
 
   window.addEventListener('keydown', (e) => {
+    if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
     const target = e.target as HTMLElement | null;
-    if (target && (target.tagName === 'INPUT' || target.tagName === 'SELECT')) {
-      if (e.code !== 'Escape') return;
-    }
+    // Keep native editing / button activation, while allowing letter shortcuts.
+    if (target?.closest('input, select, textarea, [contenteditable="true"]')) return;
+    if (target?.closest('button') && (e.code === 'Space' || e.code === 'Enter')) return;
     if (cameraSystem.handleKey(e.code)) {
       ui.setCameraActive('free');
       ui.setCinematicActive(cameraSystem.cinematic);
@@ -302,8 +303,7 @@ async function boot(): Promise<void> {
         });
         break;
       case 'KeyG':
-        diagnosticsVisible = !diagnosticsVisible;
-        ui.setDiagnosticsVisible(diagnosticsVisible);
+        ui.toggleDiagnostics();
         break;
       case 'KeyR':
         resetAll();
@@ -315,8 +315,6 @@ async function boot(): Promise<void> {
         break;
     }
   });
-
-  let diagnosticsVisible = true;
 
   window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight, false);
@@ -390,6 +388,8 @@ async function boot(): Promise<void> {
   }
 
   function updateUi(): void {
+    ui.setCameraActive(cameraSystem.activePreset);
+    ui.setCinematicActive(cameraSystem.cinematic);
     const model: UIModel = {
       population: crowd.liveCount,
       targetPopulation: crowd.tunables.targetPopulation,

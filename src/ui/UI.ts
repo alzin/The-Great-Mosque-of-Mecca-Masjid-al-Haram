@@ -74,6 +74,13 @@ export interface CameraOption {
 }
 
 const MAX_EVENTS = 6;
+type MobileGroup = 'controls' | 'camera' | 'info';
+type MobilePage = 'crowd' | 'prayer' | 'camera' | 'display' | 'diagnostics' | 'help';
+const MOBILE_PAGES: Record<MobileGroup, readonly [MobilePage, string][]> = {
+  controls: [['crowd', 'Crowd'], ['prayer', 'Prayer']],
+  camera: [['camera', 'Camera']],
+  info: [['display', 'Display'], ['diagnostics', 'Diagnostics'], ['help', 'Help']],
+};
 
 export class UI {
   readonly root: HTMLDivElement;
@@ -109,6 +116,17 @@ export class UI {
   private readonly loadingOverlay: HTMLDivElement;
   private readonly progressFill: HTMLDivElement;
   private readonly progressLabel: HTMLDivElement;
+  private readonly mobileQuery = window.matchMedia('(max-width: 900px), (max-height: 500px) and (pointer: coarse)');
+  private readonly sheetPanel = el('div', 'sheet-panel');
+  private readonly sheetContent = el('div', 'sheet-content');
+  private readonly sheetTabs = el('div', 'sheet-tabs');
+  private readonly sheetTitle = el('h2');
+  private readonly sheetBackdrop = button('Dismiss panel', () => this.closeSheet());
+  private readonly dockButtons = new Map<MobileGroup, HTMLButtonElement>();
+  private mobilePauseButton!: HTMLButtonElement;
+  private mobileGroup: MobileGroup | null = null;
+  private mobilePage: MobilePage = 'crowd';
+  private helpVisible = false;
 
 
   constructor(
@@ -131,7 +149,10 @@ export class UI {
     // --- Title -------------------------------------------------------------
     const title = el('div', 'title-block');
     const h1 = el('h1');
-    h1.textContent = 'Masjid al-Haram \u2014 central precinct';
+    h1.append(document.createTextNode('Masjid al-Haram'));
+    const titleDetail = el('span', 'title-detail');
+    titleDetail.textContent = ' \u2014 central precinct';
+    h1.append(titleDetail);
     const sub = el('p');
     sub.textContent =
       'Agent-based reconstruction of tawaf and congregational prayer. Approximate dimensions.';
@@ -146,7 +167,7 @@ export class UI {
 
     // Population
     {
-      const s = section('Population');
+      const s = section('Population', 'crowd');
       const { number, slider, error } = numberWithSlider(
         'Target',
         0,
@@ -185,7 +206,7 @@ export class UI {
 
     // Flow
     {
-      const s = section('Flow');
+      const s = section('Flow', 'crowd');
       const arrival = numberWithSlider(
         'Arrivals /min',
         0,
@@ -208,7 +229,7 @@ export class UI {
 
     // Simulation
     {
-      const s = section('Simulation');
+      const s = section('Simulation', 'crowd');
       const row = el('div', 'button-row');
       this.pauseButton = button('Pause', () => cb.togglePause());
       this.pauseButton.setAttribute('aria-pressed', 'false');
@@ -258,7 +279,7 @@ export class UI {
 
     // Prayer
     {
-      const s = section('Congregational prayer');
+      const s = section('Congregational prayer', 'prayer');
       const row = el('div', 'button-row');
       this.prayerButton = button('Call to prayer', () => cb.callPrayer());
       this.cancelButton = button('Cancel', () => cb.cancelPrayer());
@@ -321,10 +342,13 @@ export class UI {
 
     // Camera
     {
-      const s = section('Camera');
+      const s = section('Camera', 'camera');
       const row = el('div', 'button-row');
       cameras.forEach((c, i) => {
-        const b = button(c.label, () => cb.setCamera(c.id));
+        const b = button(c.label, () => {
+          cb.setCamera(c.id);
+          if (this.mobileQuery.matches) this.closeSheet();
+        });
         b.title = `${c.description} (key ${i + 1})`;
         b.setAttribute('aria-pressed', String(c.id === defaults.camera));
         this.cameraButtons.set(c.id, b);
@@ -343,14 +367,14 @@ export class UI {
       s.append(row2);
 
       const hint = el('p', 'hint');
-      hint.textContent = 'Drag to orbit, scroll to dolly, arrow keys to look. The orbit is constrained to the precinct.';
+      hint.textContent = 'Drag with one finger to orbit. Pinch with two fingers to zoom. With a mouse, drag to orbit and scroll to zoom. Arrow keys also move the camera.';
       s.append(hint);
       controls.append(s);
     }
 
     // Display
     {
-      const s = section('Display');
+      const s = section('Display', 'display');
       const row = el('div', 'button-row');
       for (const q of ['low', 'medium', 'high'] as const) {
         const b = button(q[0].toUpperCase() + q.slice(1), () => cb.setQuality(q));
@@ -384,6 +408,7 @@ export class UI {
 
     // --- Diagnostics -------------------------------------------------------
     this.diagnosticsPanel = el('div', 'panel diagnostics');
+    this.diagnosticsPanel.dataset.mobilePage = 'diagnostics';
     this.diagnosticsPanel.setAttribute('aria-label', 'Performance diagnostics');
     const dh = el('h2');
     dh.textContent = 'Diagnostics';
@@ -422,6 +447,7 @@ export class UI {
 
     // --- Event log ---------------------------------------------------------
     const log = el('div', 'panel event-log');
+    log.dataset.mobilePage = 'diagnostics';
     const lh = el('h2');
     lh.textContent = 'Events';
     this.eventList = el('ul') as HTMLUListElement;
@@ -440,9 +466,11 @@ export class UI {
 
     // --- Help --------------------------------------------------------------
     this.helpPanel = el('div', 'panel help');
-    this.helpPanel.style.display = 'none';
+    this.helpPanel.dataset.mobilePage = 'help';
     const hh = el('h2');
-    hh.textContent = 'Keyboard';
+    hh.textContent = 'Getting around';
+    const touchHelp = el('p', 'touch-help');
+    touchHelp.textContent = 'Drag to explore the courtyard. Pinch to zoom. Use the bottom bar for controls and camera views. Swipe down on a panel’s header or tap × to close it.';
     const hdl = el('dl');
     for (const [k, v] of [
       ['Space', 'Pause / resume'],
@@ -462,8 +490,10 @@ export class UI {
       dd.textContent = v;
       hdl.append(dt, dd);
     }
-    this.helpPanel.append(hh, hdl);
+    this.helpPanel.append(hh, touchHelp, hdl);
     this.root.append(this.helpPanel);
+
+    this.setupMobileNavigation(cb, controls, log);
 
     // --- Loading overlay ---------------------------------------------------
     this.loadingOverlay = el('div', 'overlay');
@@ -488,6 +518,142 @@ export class UI {
     this.arrivalNumber.value = String(defaults.arrivalRate);
     this.arrivalSlider.value = String(defaults.arrivalRate);
     this.circuitsNumber.value = String(defaults.circuits);
+  }
+
+  /** One set of controls: desktop panels become a compact, non-modal phone sheet. */
+  private setupMobileNavigation(cb: UICallbacks, controls: HTMLDivElement, log: HTMLDivElement): void {
+    this.sheetPanel.id = uid();
+    this.sheetTitle.id = uid();
+    this.sheetTitle.tabIndex = -1;
+    this.sheetPanel.setAttribute('aria-labelledby', this.sheetTitle.id);
+    const header = el('div', 'sheet-header');
+    const handle = el('div', 'sheet-handle');
+    handle.setAttribute('aria-hidden', 'true');
+    const close = button('\u00d7', () => this.closeSheet());
+    close.className = 'sheet-close';
+    close.setAttribute('aria-label', 'Close panel');
+    header.append(handle, this.sheetTitle, close);
+    this.sheetContent.append(controls, this.diagnosticsPanel, log, this.helpPanel);
+    this.sheetPanel.append(header, this.sheetTabs, this.sheetContent);
+    this.sheetBackdrop.className = 'sheet-backdrop';
+    this.sheetBackdrop.textContent = '';
+    this.sheetBackdrop.tabIndex = -1;
+    this.sheetBackdrop.setAttribute('aria-hidden', 'true');
+
+    const dock = el('nav', 'mobile-dock');
+    dock.setAttribute('aria-label', 'Simulation navigation');
+    this.mobilePauseButton = button('Pause', () => cb.togglePause());
+    this.mobilePauseButton.setAttribute('aria-pressed', 'false');
+    setDockLabel(this.mobilePauseButton, 'pause', 'Pause');
+    dock.append(this.mobilePauseButton);
+    for (const [id, label, icon] of [
+      ['controls', 'Controls', 'sliders'],
+      ['camera', 'Camera', 'camera'],
+      ['info', 'Info', 'info'],
+    ] as const) {
+      const b = button(label, () => {
+        if (this.mobileGroup === id) this.closeSheet();
+        else this.openSheet(id);
+      });
+      setDockLabel(b, icon, label);
+      b.setAttribute('aria-controls', this.sheetPanel.id);
+      b.setAttribute('aria-expanded', 'false');
+      this.dockButtons.set(id, b);
+      dock.append(b);
+    }
+    this.root.append(this.sheetBackdrop, this.sheetPanel, dock);
+
+    // A swipe on the header dismisses; scrolling or adjusting sliders never does.
+    let swipe: { id: number; x: number; y: number } | null = null;
+    header.addEventListener('pointerdown', (e) => {
+      if (!this.mobileQuery.matches || (e.target as HTMLElement).closest('button')) return;
+      swipe = { id: e.pointerId, x: e.clientX, y: e.clientY };
+      header.setPointerCapture(e.pointerId);
+    });
+    header.addEventListener('pointerup', (e) => {
+      if (swipe?.id !== e.pointerId) return;
+      if (e.clientY - swipe.y > 48 && Math.abs(e.clientX - swipe.x) < 80) this.closeSheet();
+      swipe = null;
+      if (header.hasPointerCapture(e.pointerId)) header.releasePointerCapture(e.pointerId);
+    });
+    header.addEventListener('pointercancel', () => { swipe = null; });
+    header.addEventListener('lostpointercapture', () => { swipe = null; });
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this.mobileQuery.matches && this.mobileGroup) {
+        this.closeSheet();
+        e.preventDefault();
+      }
+    });
+    this.mobileQuery.addEventListener('change', () => {
+      const focusInSheet = this.sheetPanel.contains(document.activeElement);
+      const focusInDock = dock.contains(document.activeElement);
+      this.mobileGroup = null;
+      this.syncSheet();
+      if (this.mobileQuery.matches && focusInSheet) this.dockButtons.get('controls')?.focus();
+      else if (!this.mobileQuery.matches && (focusInDock || focusInSheet)) document.getElementById('viewport')?.focus();
+    });
+
+    // Keep the dock and sheet above the software keyboard / browser chrome.
+    const syncViewport = () => {
+      const viewport = window.visualViewport;
+      const height = viewport?.height ?? window.innerHeight;
+      this.root.style.setProperty('--visible-height', `${height}px`);
+      this.root.style.setProperty('--visible-top', `${viewport?.offsetTop ?? 0}px`);
+      this.root.classList.toggle('viewport-compact', height < 500);
+    };
+    window.visualViewport?.addEventListener('resize', syncViewport);
+    window.visualViewport?.addEventListener('scroll', syncViewport);
+    window.addEventListener('resize', syncViewport);
+    syncViewport();
+    this.syncSheet();
+  }
+
+  private openSheet(group: MobileGroup, page = MOBILE_PAGES[group][0][0]): void {
+    this.mobileGroup = group;
+    this.mobilePage = page;
+    this.sheetTitle.textContent = group === 'info' ? 'Information' : group === 'camera' ? 'Camera views' : 'Simulation controls';
+    this.sheetTabs.replaceChildren();
+    this.sheetTabs.setAttribute('aria-label', `${this.sheetTitle.textContent} sections`);
+    const pages = MOBILE_PAGES[group];
+    this.sheetTabs.hidden = pages.length < 2;
+    for (const [id, label] of pages) {
+      const tab = button(label, () => {
+        this.mobilePage = id;
+        this.syncSheet();
+        this.sheetContent.scrollTop = 0;
+      });
+      tab.dataset.page = id;
+      this.sheetTabs.append(tab);
+    }
+    this.syncSheet();
+    this.sheetContent.scrollTop = 0;
+    this.sheetTitle.focus({ preventScroll: true });
+  }
+
+  private closeSheet(): void {
+    const previous = this.mobileGroup;
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && this.sheetPanel.contains(active)) active.blur();
+    this.mobileGroup = null;
+    this.syncSheet();
+    if (previous) this.dockButtons.get(previous)?.focus({ preventScroll: true });
+  }
+
+  private syncSheet(): void {
+    const mobile = this.mobileQuery.matches;
+    const open = mobile && this.mobileGroup !== null;
+    this.sheetPanel.classList.toggle('is-open', open);
+    this.sheetPanel.inert = mobile && !open;
+    this.sheetPanel.setAttribute('role', mobile ? 'region' : 'presentation');
+    this.sheetBackdrop.hidden = !open;
+    this.root.classList.toggle('sheet-open', open);
+    for (const [id, b] of this.dockButtons) b.setAttribute('aria-expanded', String(open && id === this.mobileGroup));
+    for (const node of this.sheetContent.querySelectorAll<HTMLElement>('[data-mobile-page]')) {
+      node.dataset.active = String(node.dataset.mobilePage === this.mobilePage);
+    }
+    for (const tab of this.sheetTabs.querySelectorAll('button')) {
+      tab.setAttribute('aria-pressed', String(tab.dataset.page === this.mobilePage));
+    }
   }
 
   // -----------------------------------------------------------------------
@@ -564,6 +730,8 @@ export class UI {
   setPaused(paused: boolean): void {
     this.pauseButton.textContent = paused ? 'Resume' : 'Pause';
     this.pauseButton.setAttribute('aria-pressed', String(paused));
+    setDockLabel(this.mobilePauseButton, paused ? 'play' : 'pause', paused ? 'Resume' : 'Pause');
+    this.mobilePauseButton.setAttribute('aria-pressed', String(paused));
   }
 
   setCameraActive(id: string): void {
@@ -588,12 +756,26 @@ export class UI {
   }
 
   setDiagnosticsVisible(on: boolean): void {
-    this.diagnosticsPanel.style.display = on ? 'block' : 'none';
+    this.diagnosticsPanel.classList.toggle('diagnostics-hidden', !on);
+  }
+
+  toggleDiagnostics(): void {
+    if (this.mobileQuery.matches) {
+      if (this.mobileGroup === 'info' && this.mobilePage === 'diagnostics') this.closeSheet();
+      else this.openSheet('info', 'diagnostics');
+      return;
+    }
+    this.setDiagnosticsVisible(this.diagnosticsPanel.classList.contains('diagnostics-hidden'));
   }
 
   toggleHelp(): void {
-    const showing = this.helpPanel.style.display !== 'none';
-    this.helpPanel.style.display = showing ? 'none' : 'block';
+    if (this.mobileQuery.matches) {
+      if (this.mobileGroup === 'info' && this.mobilePage === 'help') this.closeSheet();
+      else this.openSheet('info', 'help');
+      return;
+    }
+    this.helpVisible = !this.helpVisible;
+    this.helpPanel.classList.toggle('help-visible', this.helpVisible);
   }
 
   pushEvent(time: number, text: string): void {
@@ -625,8 +807,9 @@ export class UI {
       this.setPopulationInputs(m.targetPopulation);
     }
 
-    this.phaseLabel.textContent = GLOBAL_PHASE_NAMES[m.phase] ?? 'Normal activity';
-    this.phaseDetail.textContent = m.phaseDetail;
+    const phase = (GLOBAL_PHASE_NAMES[m.phase] ?? 'Normal activity').toLowerCase().replaceAll('_', ' ');
+    setText(this.phaseLabel, phase.charAt(0).toUpperCase() + phase.slice(1));
+    setText(this.phaseDetail, m.phaseDetail);
     this.prayerButton.disabled = m.phase !== GlobalPhase.NORMAL_ACTIVITY;
     this.cancelButton.disabled = m.phase === GlobalPhase.NORMAL_ACTIVITY;
 
@@ -669,8 +852,9 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-function section(title: string): HTMLElement {
+function section(title: string, page: MobilePage): HTMLElement {
   const s = el('section', 'section');
+  s.dataset.mobilePage = page;
   const h = el('h2');
   h.textContent = title;
   s.append(h);
@@ -683,6 +867,30 @@ function button(label: string, onClick: () => void): HTMLButtonElement {
   b.textContent = label;
   b.addEventListener('click', onClick);
   return b;
+}
+
+function setDockLabel(b: HTMLButtonElement, name: string, label: string): void {
+  const paths: Record<string, string> = {
+    pause: 'M8 5v14M16 5v14',
+    play: 'm8 5 11 7-11 7Z',
+    sliders: 'M4 7h5m4 0h7M4 17h9m4 0h3M9 4v6m4 4v6',
+    camera: 'M4 7h4l2-3h4l2 3h4v13H4ZM16 13a4 4 0 1 1-8 0 4 4 0 0 1 8 0',
+    info: 'M12 11v6m0-10v.01M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',
+  };
+  const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  icon.setAttribute('viewBox', '0 0 24 24');
+  icon.setAttribute('fill', 'none');
+  icon.setAttribute('stroke', 'currentColor');
+  icon.setAttribute('stroke-width', '1.7');
+  icon.setAttribute('stroke-linecap', 'round');
+  icon.setAttribute('stroke-linejoin', 'round');
+  icon.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', paths[name]);
+  icon.append(path);
+  const text = el('span');
+  text.textContent = label;
+  b.replaceChildren(icon, text);
 }
 
 function setText(node: HTMLElement | undefined, text: string): void {
@@ -702,6 +910,7 @@ function labelledNumber(
   l.textContent = label;
   const input = el('input') as HTMLInputElement;
   input.type = 'number';
+  input.inputMode = 'numeric';
   input.min = String(min);
   input.max = String(max);
   input.step = String(step);
