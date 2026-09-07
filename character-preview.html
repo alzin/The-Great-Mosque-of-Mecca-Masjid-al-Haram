@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Character preview (development)</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #202428;
+        color: #ddd;
+        font: 12px ui-monospace, monospace;
+      }
+      #label {
+        position: fixed;
+        top: 10px;
+        left: 12px;
+        z-index: 2;
+        white-space: pre;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="label">loading…</div>
+    <script type="module" src="/src/dev/characterPreview.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,31 @@
+{
+  "name": "haram-tawaf-simulation",
+  "version": "1.0.0",
+  "description": "Real-time 3D agent-based simulation of tawaf and congregational prayer in the central area of Masjid al-Haram. Not a live feed.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "soak": "vitest run --config vitest.soak.config.ts",
+    "bench": "node --experimental-strip-types tools/bench.ts",
+    "qa": "node tools/visual-qa.mjs",
+    "poses": "node --experimental-strip-types tools/pose-check.ts",
+    "solve": "node --experimental-strip-types tools/solve-poses.ts"
+  },
+  "dependencies": {
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "@types/three": "^0.185.4",
+    "playwright": "^1.56.0",
+    "typescript": "^5.9.3",
+    "vite": "^8.2.2",
+    "vitest": "^5.0.0"
+  },
+  "private": true,
+  "type": "module"
+}
