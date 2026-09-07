@@ -24,6 +24,7 @@ import { DebugCollisionView } from './env/DebugCollision.ts';
 import { CameraSystem, CAMERA_PRESETS } from './camera/CameraSystem.ts';
 import { AudioSystem } from './audio/AudioSystem.ts';
 import { startAutoplay } from './audio/autoplay.ts';
+import { AdhanPlayer } from './audio/AdhanPlayer.ts';
 import { FixedClock, FrameTimer } from './core/Clock.ts';
 import { UI, type UIModel } from './ui/UI.ts';
 
@@ -75,10 +76,9 @@ async function boot(): Promise<void> {
       setSpeed: (v) => {
         speed = v;
       },
-      callPrayer: () => {
-        if (orchestrator.prepare(clock.stats.simTime)) flushEvents();
-      },
+      callPrayer: () => callPrayer(),
       cancelPrayer: () => {
+        adhan.stop(true);
         orchestrator.cancel(clock.stats.simTime);
         flushEvents();
       },
@@ -104,9 +104,7 @@ async function boot(): Promise<void> {
       },
       setQuality: (q) => applyQuality(q),
       reset: () => resetAll(),
-      toggleAudio: () => {
-        void audio.toggle();
-      },
+      toggleAudio: () => toggleAudio(),
       setDebugCollision: (on) => {
         debugView.setVisible(on);
       },
@@ -183,9 +181,13 @@ async function boot(): Promise<void> {
   // --- Camera / audio ------------------------------------------------------
   const cameraSystem = new CameraSystem(canvas, window.innerWidth / window.innerHeight);
   const audio = new AudioSystem((state, error) => {
-    ui.setAudioState(state, audio.currentSurah);
+    refreshAudioControls();
     if (state === 'unavailable' && error) ui.showNotice(error);
     if (state === 'blocked') ui.showNotice('Tap, click, or press a key to start Quran recitation.', 10000);
+  });
+  const adhan = new AdhanPlayer(audio, (_state, error) => {
+    refreshAudioControls();
+    if (error) ui.showNotice(error);
   });
 
   // --- Loop state ----------------------------------------------------------
@@ -204,6 +206,25 @@ async function boot(): Promise<void> {
   if (window.matchMedia('(pointer: fine)').matches) canvas.focus({ preventScroll: true });
 
   // --- Helpers -------------------------------------------------------------
+
+  function refreshAudioControls(): void {
+    ui.setAudioState(adhan.active ? adhan.state : audio.state, audio.currentSurah, adhan.active);
+  }
+
+  function toggleAudio(): void {
+    if (adhan.active) {
+      adhan.stop();
+      audio.stop();
+    } else {
+      void audio.toggle();
+    }
+  }
+
+  function callPrayer(): void {
+    if (!orchestrator.prepare(clock.stats.simTime)) return;
+    void adhan.start();
+    flushEvents();
+  }
 
   function setTargetPopulation(n: number): void {
     const clamped = Math.max(0, Math.min(CAPACITY, Math.round(n)));
@@ -234,6 +255,7 @@ async function boot(): Promise<void> {
   }
 
   function resetAll(): void {
+    adhan.stop(true);
     orchestrator.reset();
     crowd.reset(crowd.tunables.targetPopulation);
     clock.reset();
@@ -295,10 +317,10 @@ async function boot(): Promise<void> {
         ui.setCinematicActive(cameraSystem.cinematic);
         break;
       case 'KeyP':
-        if (orchestrator.prepare(clock.stats.simTime)) flushEvents();
+        callPrayer();
         break;
       case 'KeyM':
-        void audio.toggle();
+        toggleAudio();
         break;
       case 'KeyG':
         ui.toggleDiagnostics();
@@ -420,6 +442,7 @@ async function boot(): Promise<void> {
   const cancelAutoplay = startAutoplay(audio);
   window.addEventListener('pagehide', () => {
     cancelAutoplay();
+    adhan.stop();
     audio.stop();
   });
 

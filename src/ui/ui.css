@@ -115,6 +115,27 @@ body {
 
 /* --- Panels --------------------------------------------------------------- */
 
+.audio-toggle {
+  position: absolute;
+  top: 16px;
+  left: 372px;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--ui-bg);
+  box-shadow: 0 3px 16px #0003;
+  z-index: 10;
+}
+
+.audio-toggle svg { width: 21px; height: 21px; }
+.audio-toggle span { display: none; }
+.audio-toggle[aria-pressed='true'] { color: var(--ui-accent); border-color: var(--ui-accent); }
+.audio-toggle[data-state='starting'] { border-style: dashed; }
+.audio-source { color: var(--ui-accent); font-size: 11px; }
+
 .panel {
   background: var(--ui-bg);
   border: 1px solid var(--ui-border);
@@ -594,7 +615,7 @@ button[aria-pressed='true'] {
   .title-block {
     top: max(14px, env(safe-area-inset-top, 0px));
     left: var(--edge-left);
-    right: var(--edge-right);
+    right: calc(var(--edge-right) + 58px);
     max-width: none;
   }
 
@@ -602,6 +623,12 @@ button[aria-pressed='true'] {
     font-size: 18px;
     letter-spacing: -0.02em;
     text-shadow: 0 1px 8px #000, 0 1px 2px #000;
+  }
+
+  .audio-toggle {
+    top: max(14px, env(safe-area-inset-top, 0px));
+    left: auto;
+    right: var(--edge-right);
   }
 
   .title-block p,

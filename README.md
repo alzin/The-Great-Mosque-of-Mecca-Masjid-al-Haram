@@ -5,6 +5,9 @@ agent-based crowd performing tawaf around the Kaaba, entering and leaving
 through the gates, and forming curved concentric rows for congregational
 prayer.
 
+[Live website](https://alzin.github.io/The-Great-Mosque-of-Mecca-Masjid-al-Haram/)
+· [GitHub repository](https://github.com/alzin/The-Great-Mosque-of-Mecca-Masjid-al-Haram)
+
 **The 3D scene is a simulation, not a live feed or a recording.** The visuals
 are not a broadcast, a photograph, or a measured survey of the real building. The
 dimensions are a reconstruction assembled from published figures; the crowd is
@@ -82,13 +85,22 @@ rak'ahs are adjustable.
 Al-Sudais**, provided by [MP3Quran.net](https://www.mp3quran.net/ar/sds).
 The app attempts to start playback automatically when it is ready. If the
 browser blocks audible autoplay, it retries on your first click, tap, or key press.
-Press **Quran** or `M` to pause or resume at the same position. A deliberate
+Use the always-visible **speaker icon** or `M` to pause or resume at the same position. A deliberate
 pause stays paused through later interactions until you request playback again.
 Recitation starts with Al-Fatihah, continues through all 114 surahs in Quran
 order, and stops after An-Nas; a new play request then starts again at
 Al-Fatihah. It plays at its original speed, independently of the simulation's
 speed or pause state. If the stream fails, the control shows an error and
 allows you to retry.
+
+**Haram adhan.** Press **Call to prayer** or `P` to play the regular adhan by
+Sheikh Ali Ahmed Mulla and begin the simulation's prayer preparation.
+Quran pauses while the adhan plays, then resumes at the same position only
+if it was enabled before the call. The speaker icon stops the adhan and keeps
+Quran paused. Cancelling/resetting the prayer stops the adhan and restores
+the previous Quran playback choice. The recording plays once at its original
+speed; the demonstration clock runs independently. Scheduled prayer cycles
+do not automatically play adhan. Source and streaming details are in ASSETS.md.
 
 **Collision view** (under Display) draws the simplified primitives the crowd
 actually steers around, rather than the rendered architecture. This is the only
@@ -151,8 +163,8 @@ calligraphy and the inscription friezes are deliberately absent, and rendered
 as abstract gold relief instead. See ASSETS.md.
 
 **Audio is separate from prayer events.** The Quran recordings are
-not synchronised to the simulated prayer. Adhan and iqamah events have no
-audio. No crowd noise or synthesised call to prayer is used.
+not synchronised to the simulated prayer. The manual call plays a recorded
+Haram adhan; iqamah has no audio. No crowd noise or synthesised call to prayer is used.
 
 **The crowd model is a model.** Social forces with a density–speed coupling
 reproduce plausible aggregate flow. They are not validated against measured

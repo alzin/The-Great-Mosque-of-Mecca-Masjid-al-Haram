@@ -16,6 +16,7 @@
 import { AGENT_STATE_NAMES, GLOBAL_PHASE_NAMES, GlobalPhase } from '../sim/States.ts';
 import type { AudioState } from '../audio/AudioSystem.ts';
 import { RECITATION } from '../audio/recitation.ts';
+import { ADHAN } from '../audio/AdhanPlayer.ts';
 
 export type QualityName = 'low' | 'medium' | 'high';
 
@@ -163,6 +164,14 @@ export class UI {
     badge.textContent = '3D simulation \u2014 not a live feed';
     title.append(h1, sub, badge);
     this.root.append(title);
+
+    this.audioButton = button('', () => cb.toggleAudio());
+    this.audioButton.className = 'audio-toggle';
+    this.audioButton.setAttribute('aria-label', 'Play Quran');
+    this.audioButton.setAttribute('aria-pressed', 'false');
+    this.audioButton.title = 'Play Quran (M)';
+    setDockLabel(this.audioButton, 'sound-off', 'Quran');
+    this.root.append(this.audioButton);
 
     // --- Controls ----------------------------------------------------------
     const controls = el('div', 'panel controls');
@@ -338,8 +347,15 @@ export class UI {
 
       const hint = el('p', 'hint');
       hint.textContent =
-        'A demonstration clock, not a prayer-time calculator. Adhan, iqamah and the start of the prayer are separate events. Optional Quran playback runs independently of the prayer animation.';
+        'Call to prayer plays the Haram adhan by Ali Ahmed Mulla and pauses Quran playback until it finishes. The demonstration clock runs independently of the recording.';
       s.append(hint);
+      const adhanSource = el('a') as HTMLAnchorElement;
+      adhanSource.href = ADHAN.sourcePage;
+      adhanSource.textContent = 'Adhan recording · Islamweb';
+      adhanSource.className = 'audio-source';
+      adhanSource.target = '_blank';
+      adhanSource.rel = 'noopener noreferrer';
+      s.append(adhanSource);
       controls.append(s);
     }
 
@@ -386,13 +402,6 @@ export class UI {
         row.append(b);
       }
       s.append(row);
-
-      const row2 = el('div', 'button-row');
-      this.audioButton = button('Quran: off', () => cb.toggleAudio());
-      this.audioButton.setAttribute('aria-pressed', 'false');
-      this.audioButton.title = 'Play or pause Quran recitation (M)';
-      row2.append(this.audioButton);
-      s.append(row2);
 
       this.audioTrack = el('p', 'hint');
       this.audioTrack.setAttribute('aria-live', 'polite');
@@ -772,12 +781,16 @@ export class UI {
     }
   }
 
-  setAudioState(state: AudioState, surah: number): void {
-    const label = state === 'starting' ? 'loading…' : state === 'unavailable' ? 'retry' : state === 'blocked' ? 'play' : state;
-    this.audioButton.textContent = `Quran: ${label}`;
-    this.audioButton.setAttribute('aria-pressed', String(state === 'on' || state === 'starting'));
+  setAudioState(state: AudioState, surah: number, adhan = false): void {
+    const on = state === 'on' || state === 'starting';
+    const action = adhan ? 'Stop adhan' : on ? 'Pause Quran' : state === 'unavailable' ? 'Retry Quran' : 'Play Quran';
+    setDockLabel(this.audioButton, on ? 'sound-on' : 'sound-off', adhan ? 'Adhan' : 'Quran');
+    this.audioButton.setAttribute('aria-label', action);
+    this.audioButton.title = `${action}${state === 'starting' ? ' · Loading' : ''} (M)`;
+    this.audioButton.setAttribute('aria-pressed', String(on));
+    this.audioButton.dataset.state = state;
     const name = surah === 1 ? 'Al-Fatihah · ' : surah === 2 ? 'Al-Baqarah · ' : '';
-    this.audioTrack.textContent = `${name}Surah ${surah} of ${RECITATION.surahCount}`;
+    this.audioTrack.textContent = adhan ? `Haram adhan · ${ADHAN.muezzin}` : `${name}Surah ${surah} of ${RECITATION.surahCount}`;
   }
 
   setDiagnosticsVisible(on: boolean): void {
@@ -896,6 +909,8 @@ function button(label: string, onClick: () => void): HTMLButtonElement {
 
 function setDockLabel(b: HTMLButtonElement, name: string, label: string): void {
   const paths: Record<string, string> = {
+    'sound-on': 'M11 4 6 8H3v8h3l5 4ZM15 8a6 6 0 0 1 0 8M18 5a10 10 0 0 1 0 14',
+    'sound-off': 'M11 4 6 8H3v8h3l5 4ZM16 9l6 6m0-6-6 6',
     pause: 'M8 5v14M16 5v14',
     play: 'm8 5 11 7-11 7Z',
     sliders: 'M4 7h5m4 0h7M4 17h9m4 0h3M9 4v6m4 4v6',
