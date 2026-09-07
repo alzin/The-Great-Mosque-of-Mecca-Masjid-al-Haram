@@ -1,6 +1,7 @@
 {
   "name": "haram-tawaf-simulation",
   "version": "1.0.0",
+  "license": "MIT",
   "description": "Real-time 3D agent-based simulation of tawaf and congregational prayer in the central area of Masjid al-Haram. Not a live feed.",
   "scripts": {
     "dev": "vite",

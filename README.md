@@ -200,6 +200,20 @@ inventing a number.
 
 ## Documentation
 
+- **CONTRIBUTING.md** — how to report issues and submit changes
+
 - **ARCHITECTURE.md** — how it works and why each trade-off was made
 - **ASSETS.md** — asset and licence manifest, and what is deliberately absent
 - **TEST-REPORT.md** — measurements, what was verified, and what was not
+
+## Contributing
+
+Contributions are welcome. Read the [contribution guide](CONTRIBUTING.md),
+[open an issue](https://github.com/alzin/The-Great-Mosque-of-Mecca-Masjid-al-Haram/issues),
+or submit a pull request with your improvements.
+
+## License
+
+The project's original code and documentation are released under the
+[MIT License](LICENSE). Third-party dependencies and streamed Quran/adhan
+recordings retain their own rights and terms; see [ASSETS.md](ASSETS.md).
